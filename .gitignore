@@ -1,1 +1,9 @@
 node_modules/
+bower_components/
+
+.DS_*
+*.log
+logs/
+**/*.backup.*
+**/*.back.*
+.env
