@@ -69,10 +69,10 @@ export function getData(api_route, bake_parms_into_url, request_params, request_
     .then((response) => {
         if(!response.ok || response.status != 200)
             throw new Error(`A fetch call failed: OK:${response.ok} STATUS:${response.status}`)
-
         return response.json();
     })
     .then((response_json) => {
+        console.log(response_json);
         let return_value = {ok:true, body: response_json};
         return return_value;
     })
