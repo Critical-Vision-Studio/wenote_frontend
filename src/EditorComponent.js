@@ -1,9 +1,16 @@
 import React from "react";
-import MDEditor from '@uiw/react-md-editor';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Highlight from '@tiptap/extension-highlight';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { common, createLowlight } from 'lowlight';
 import { getData, handlePromise, RequestMethodType } from "./utils";
 
-async function sendNodeUpdateRequest(note_path, branch_name, commit_id, note_value, onSuccessCallback, onFailureCallback)
-{
+const REPO_NAME = "wenote-repo";
+
+const lowlight = createLowlight(common);
+
+async function sendNodeUpdateRequest(note_path, branch_name, commit_id, note_value, onSuccessCallback, onFailureCallback) {
   if(!note_path || !branch_name || !commit_id){
     console.log(`Note Update Prevented: arguments empty note_path:${note_path} branch_name:${branch_name} commit_id:${commit_id}`);
     return;
@@ -13,10 +20,11 @@ async function sendNodeUpdateRequest(note_path, branch_name, commit_id, note_val
   let api_route = ["update-note"];
   let request_options = {method: RequestMethodType.PUT, mode: "cors",};
   let request_params = { 
-    note_path:note_path,
-    note_value:note_value,
-    commit_id:commit_id,
-    branch_name:branch_name,
+    note_path: note_path,
+    note_value: note_value,
+    commit_id: commit_id,
+    branch_name: branch_name,
+    repo_name: REPO_NAME,
    };
 
   let [promise, abortRequest] = getData(api_route, false, request_params, request_options);
@@ -25,8 +33,7 @@ async function sendNodeUpdateRequest(note_path, branch_name, commit_id, note_val
   return abortRequest;
 }
 
-function effectGetNote(note_path, branch_name, setNoteText, setCommitId)
-{
+function effectGetNote(note_path, branch_name, setNoteText, setCommitId) {
   if(!note_path || !branch_name){
     console.log(`Note Fetch Prevented: arguments empty note_path:${note_path} branch_name:${branch_name}`);
     return;
@@ -35,8 +42,9 @@ function effectGetNote(note_path, branch_name, setNoteText, setCommitId)
   let api_route = ["get-note"];
   let request_options = {method: RequestMethodType.GET, mode: "cors",};
   let request_params = { 
-    note_path:note_path,
-    branch_name:branch_name,
+    note_path: note_path,
+    branch_name: branch_name,
+    repo_name: REPO_NAME,
    };
 
   let [promise, abortRequest] = getData(api_route, true, request_params, request_options);
@@ -49,95 +57,170 @@ function effectGetNote(note_path, branch_name, setNoteText, setCommitId)
   return abortRequest;
 }
 
-function effectAddEventListenerUpdateNote(note_path, 
-                                          branch_name, commit_id, 
-                                          setBranchNme, setCommitId, 
-                                          componentNodeRef, 
-                                          noteText, setNoteText, 
-                                          nodeUpdateRequestAbortCallback)
-{
-    // main source:    https://bobbyhadz.com/blog/react-functional-component-add-event-listener
-    // extra examples: https://blog.logrocket.com/complete-guide-react-refs/#creating-refs-using-createref-hook
-    // custom events:  https://stackoverflow.com/questions/64032647/event-listener-for-multiple-keys-in-react
-
-    console.log(`useeffect fire! ${noteText}`);
-    // componentNodeRef is already non-null here 
-    // because this function is ran after the mount event
-    const element = componentNodeRef.current;
-    if (!element)
-    {
-      // no element - no editor - nothing to update
-      return;
-    }
-
-    var handleNoteUpdateEvent = event => {
-
-      if ((event.metaKey || event.ctrlKey) && event.code === 'KeyS')
-      {
-          event.preventDefault();
-          event.stopPropagation();
-          console.log(`fire! ${noteText}`);
-          // setting to captured data member 
-          nodeUpdateRequestAbortCallback.current = sendNodeUpdateRequest(note_path, branch_name, commit_id, noteText, 
-                                            (response) => { setNoteText(response.body.note); setBranchNme(response.body.branch_name); setCommitId(response.body.commit_id); },
-                                            (response) => { setNoteText(`Request failed with: ${JSON.stringify(response.error)}`); }
-                                          );
-      }
-    };
-    
-    element.addEventListener('keydown', handleNoteUpdateEvent);
-
-    return () => {
-      // stop update request on demount: does it make sense?
-      if (nodeUpdateRequestAbortCallback)
-      {
-        //nodeUpdateRequestAbortCallback.current();
-        console.log(nodeUpdateRequestAbortCallback.current);
-        nodeUpdateRequestAbortCallback.current = null;
-      }
-      element.removeEventListener('keydown', handleNoteUpdateEvent);
-    };
-}
-
-export default function EditorComponent({note_path, branch_name, commit_id, setBranchNme, setCommitId}) {
-  // STATE
-  var [noteText, setNoteText] = React.useState("");
-  
-  // REFS - just persistant data members, do not trigger re-rendering
-  
-  // is set auto-magically by React because it is used 
-  // as "ref" attribute of the returned component
-  const componentNodeRef = React.useRef(null); 
-  const nodeUpdateRequestAbortCallback = React.useRef(null); 
-
-  // EFFECTS
-  React.useEffect(() => effectGetNote(note_path, branch_name, setNoteText, setCommitId), [note_path, branch_name]);
-  React.useEffect(() => effectAddEventListenerUpdateNote(note_path, branch_name, 
-                                                          commit_id, setBranchNme, 
-                                                          setCommitId, componentNodeRef, 
-                                                          noteText, setNoteText, 
-                                                          nodeUpdateRequestAbortCallback), [note_path, branch_name, noteText]);
-  // END EFFECTS
-  
-  // LOGIC
-  if(!branch_name){
-    return (<div> Please choose a branch. </div>);
-  }
-
-  if(!note_path){
-    return (<div> Please create or choose a note. </div>);
+const MenuBar = ({ editor }) => {
+  if (!editor) {
+    return null;
   }
 
   return (
-    <div className="editor-container" ref={componentNodeRef}>
-      <MDEditor
-        value={noteText}
-        height="100%"
-        // minHeight={50}
-        visibleDragbar={false}
-        onChange={(value) => {setNoteText(value); console.log(`INSIDE MDEDIT CALL noteText: ${noteText}`);}}
-      />
+    <div className="editor-menu">
+      <button
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        className={editor.isActive('bold') ? 'is-active' : ''}
+      >
+        bold
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        className={editor.isActive('italic') ? 'is-active' : ''}
+      >
+        italic
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleHighlight().run()}
+        className={editor.isActive('highlight') ? 'is-active' : ''}
+      >
+        highlight
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        className={editor.isActive('codeBlock') ? 'is-active' : ''}
+      >
+        code block
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
+      >
+        h1
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        className={editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}
+      >
+        h2
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        className={editor.isActive('bulletList') ? 'is-active' : ''}
+      >
+        bullet list
+      </button>
+      <button onClick={() => editor.chain().focus().undo().run()}>
+        undo
+      </button>
+      <button onClick={() => editor.chain().focus().redo().run()}>
+        redo
+      </button>
     </div>
   );
-  // pure field> <MDEditor.Markdown source={noteText} style={{ whiteSpace: 'pre-wrap' }} />
+};
+
+export default function EditorComponent({note_path, branch_name, commit_id, setBranchNme, setCommitId}) {
+  const [noteText, setNoteText] = React.useState("");
+  const abortRequestRef = React.useRef(null);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Highlight.configure({
+        multicolor: false,
+        HTMLAttributes: {
+          class: 'highlighted-text',
+        },
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+      }),
+    ],
+    content: noteText,
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      setNoteText(html);
+    },
+  });
+
+  // Effect to fetch note when note_path or branch_name changes
+  React.useEffect(() => {
+    if (note_path && branch_name) {
+      const abortRequest = effectGetNote(note_path, branch_name, text => {
+        setNoteText(text);
+        editor?.commands.setContent(text);
+      }, setCommitId);
+      return () => {
+        if (typeof abortRequest === 'function') {
+          abortRequest();
+        }
+      };
+    }
+  }, [note_path, branch_name, setCommitId, editor]);
+
+  // Effect to handle note updates with keyboard shortcut
+  React.useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.code === 'KeyS') {
+        event.preventDefault();
+        if (note_path && branch_name && commit_id && noteText) {
+          const abortRequest = sendNodeUpdateRequest(
+            note_path, 
+            branch_name, 
+            commit_id, 
+            noteText,
+            (response) => { 
+              console.log("Note updated successfully"); 
+              setCommitId(response.body.commit_id);
+            },
+            (response) => { console.error("Failed to update note:", response.error); }
+          );
+          abortRequestRef.current = abortRequest;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (abortRequestRef.current && typeof abortRequestRef.current === 'function') {
+        abortRequestRef.current();
+      }
+    };
+  }, [noteText, note_path, branch_name, commit_id, setCommitId]);
+
+  if(!branch_name) {
+    return (
+      <div className="empty-editor">
+        <div className="empty-message">
+          <h2>No Branch Selected</h2>
+          <p>Please choose a branch to continue.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="editor-container">
+      {note_path ? (
+        <>
+          <div className="editor-header">
+            <div className="file-info">
+              <span className="file-path">{note_path}</span>
+              <span className="commit-id">Commit: {commit_id?.substring(0, 7) || 'None'}</span>
+            </div>
+            <MenuBar editor={editor} />
+          </div>
+          <div className="editor-content">
+            <EditorContent editor={editor} />
+          </div>
+        </>
+      ) : (
+        <div className="empty-editor">
+          <div className="empty-message">
+            <h2>No File Selected</h2>
+            <p>Select a file from the sidebar to start editing</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

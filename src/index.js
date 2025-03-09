@@ -1,22 +1,17 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter , Routes, Route } from 'react-router-dom';
-import ServerModeDisplay from "./ServerModeDisplay.js";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from "./App.js";
 import "./styles.css";
 
-const AppRouting = () =>(
+// Create a single root for the entire application
+const root = createRoot(document.getElementById("root"));
+
+// Render the App component inside BrowserRouter
+root.render(
   <BrowserRouter>
-  <Routes>
+    <Routes>
       <Route path="/" element={<App />} />
-  </Routes>
+    </Routes>
   </BrowserRouter>
 );
-
-
-const root = createRoot(document.getElementById("root"));
-//const server_mode = createRoot(document.getElementById("server_mode"));
-
-
-root.render(<AppRouting />);
-//server_mode.render(<ServerModeDisplay/>);
