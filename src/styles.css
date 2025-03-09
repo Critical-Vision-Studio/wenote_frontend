@@ -156,9 +156,9 @@ body {
 }
 
 .editor-menu button.is-active {
-  background-color: var(--highlight-color);
-  color: var(--text-primary);
-  border-color: var(--highlight-color);
+  background-color: var(--accent-green);
+  color: var(--bg-darker);
+  border-color: var(--accent-green);
 }
 
 /* Editor content styling */
@@ -204,11 +204,51 @@ body {
 }
 
 .ProseMirror pre {
-  background-color: var(--bg-darker);
-  padding: 1em;
+  background-color: #353b41;
+  padding: 0;
   border-radius: 4px;
   overflow-x: auto;
   margin: 0.5em 0;
+  font-family: "Andale Mono", Monaco, monospace;
+  line-height: 1.5;
+  tab-size: 2;
+  position: relative;
+  display: flex;
+}
+
+/* Line numbers container */
+.ProseMirror pre .line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 1em 0.5em;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: var(--line-number);
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 2.5em;
+}
+
+/* Code content */
+.ProseMirror pre .code-content {
+  padding: 1em;
+  overflow-x: auto;
+  flex-grow: 1;
+}
+
+/* Language indicator */
+.ProseMirror pre::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #a6adc8;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 0 4px 0 4px;
+  text-transform: uppercase;
+  z-index: 1;
 }
 
 .ProseMirror pre code {
@@ -228,6 +268,79 @@ body {
   background-color: var(--highlight-color);
   padding: 0.2em 0.4em;
   border-radius: 2px;
+}
+
+.ProseMirror .code-block {
+  font-family: var(--font-computer);
+  tab-size: 2;
+}
+
+/* Syntax highlighting */
+.hljs-comment,
+.hljs-quote {
+  color: #676e7b;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag {
+  color: #c678dd;
+}
+
+.hljs-string,
+.hljs-template-string {
+  color: #98c379;
+}
+
+.hljs-number,
+.hljs-literal {
+  color: #d19a66;
+}
+
+.hljs-variable,
+.hljs-template-variable {
+  color: #e06c75;
+}
+
+.hljs-function {
+  color: #61afef;
+}
+
+.hljs-title {
+  color: #61afef;
+}
+
+.hljs-params {
+  color: #abb2bf;
+}
+
+.hljs-type,
+.hljs-class {
+  color: #e5c07b;
+}
+
+.hljs-tag {
+  color: #e06c75;
+}
+
+.hljs-attribute {
+  color: #98c379;
+}
+
+.hljs-regexp {
+  color: #98c379;
+}
+
+.hljs-symbol {
+  color: #56b6c2;
+}
+
+.hljs-built_in {
+  color: #56b6c2;
+}
+
+.hljs-meta {
+  color: #848b98;
 }
 
 /* File browser container */
@@ -330,11 +443,6 @@ body {
 
 .syntax-number {
   color: var(--accent-yellow);
-}
-
-.syntax-error {
-  color: var(--accent-red);
-  text-decoration: wavy underline;
 }
 
 /* Line numbers */
@@ -494,4 +602,113 @@ code {
 .empty-editor p {
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+/* Editor menu group */
+.editor-menu-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.editor-menu-group select {
+  background-color: var(--bg-darker);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px;
+  font-size: var(--font-label-size);
+  cursor: pointer;
+}
+
+.editor-menu-group select:hover {
+  border-color: var(--highlight-color);
+}
+
+.editor-menu-group select option {
+  background-color: var(--bg-darker);
+  color: var(--text-primary);
+}
+
+/* Vim mode indicator */
+.vim-mode-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 8px 12px;
+  background-color: var(--accent-green);
+  color: var(--bg-darker);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 1000;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+.vim-mode-indicator:hover {
+  opacity: 1;
+}
+
+/* Update editor menu button for Vim mode */
+.editor-menu button.is-active {
+  background-color: var(--accent-green);
+  color: var(--bg-darker);
+  border-color: var(--accent-green);
+}
+
+/* Bubble menu styling */
+.bubble-menu {
+  display: flex;
+  gap: 4px;
+  background-color: var(--bg-darker);
+  padding: 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.bubble-menu button {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bubble-menu button:hover {
+  background-color: var(--highlight-color);
+  color: var(--text-primary);
+}
+
+.bubble-menu button.is-active {
+  background-color: var(--accent-green);
+  color: var(--bg-darker);
+}
+
+/* Inline code styling */
+.ProseMirror .inline-code {
+  background-color: var(--bg-darker);
+  color: var(--accent-green);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: var(--font-computer);
+  font-size: 0.9em;
+}
+
+/* Ensure inline code maintains its style when inside other elements */
+.ProseMirror p code,
+.ProseMirror h1 code,
+.ProseMirror h2 code,
+.ProseMirror li code {
+  background-color: var(--bg-darker);
+  color: var(--accent-green);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: var(--font-computer);
+  font-size: 0.9em;
 }

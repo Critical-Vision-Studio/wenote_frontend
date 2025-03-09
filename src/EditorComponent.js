@@ -1,14 +1,50 @@
 import React from "react";
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { createHighlighter } from 'shiki';
 import { common, createLowlight } from 'lowlight';
 import { getData, handlePromise, RequestMethodType } from "./utils";
+import { VimMode } from './extensions/vim';
+import { keymap } from '@tiptap/pm/keymap';
+import { Selection, TextSelection } from '@tiptap/pm/state';
+import { Extension } from '@tiptap/core';
 
 const REPO_NAME = "wenote-repo";
 
 const lowlight = createLowlight(common);
+
+// Initialize shiki highlighter
+let highlighter;
+createHighlighter({
+  theme: 'one-dark-pro',
+  langs: ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'rust', 'go', 'html', 'css', 'json', 'markdown', 'yaml', 'bash', 'sql']
+}).then(h => {
+  highlighter = h;
+});
+
+// Custom extension for code blocks
+const CustomCodeBlock = CodeBlockLowlight.extend({
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Alt-c': () => this.editor.commands.toggleCodeBlock(),
+    };
+  },
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      language: {
+        default: 'plain',
+        parseHTML: element => element.getAttribute('language') || 'plain',
+        renderHTML: attributes => ({
+          language: attributes.language,
+          class: 'line-numbers-mode',
+        }),
+      },
+    };
+  },
+});
 
 async function sendNodeUpdateRequest(note_path, branch_name, commit_id, note_value, onSuccessCallback, onFailureCallback) {
   if(!note_path || !branch_name || !commit_id){
@@ -57,10 +93,25 @@ function effectGetNote(note_path, branch_name, setNoteText, setCommitId) {
   return abortRequest;
 }
 
-const MenuBar = ({ editor }) => {
+const MenuBar = ({ editor, isVimMode, setIsVimMode }) => {
   if (!editor) {
     return null;
   }
+
+  const languages = [
+    { label: 'Plain', value: 'plain' },
+    { label: 'JavaScript', value: 'javascript' },
+    { label: 'Python', value: 'python' },
+    { label: 'Java', value: 'java' },
+    { label: 'C++', value: 'cpp' },
+    { label: 'HTML', value: 'html' },
+    { label: 'CSS', value: 'css' },
+    { label: 'JSON', value: 'json' },
+    { label: 'Markdown', value: 'markdown' },
+    { label: 'YAML', value: 'yaml' },
+    { label: 'Bash', value: 'bash' },
+    { label: 'SQL', value: 'sql' },
+  ];
 
   return (
     <div className="editor-menu">
@@ -82,12 +133,32 @@ const MenuBar = ({ editor }) => {
       >
         highlight
       </button>
-      <button
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-        className={editor.isActive('codeBlock') ? 'is-active' : ''}
-      >
-        code block
-      </button>
+      <div className="editor-menu-group">
+        <button
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          className={editor.isActive('codeBlock') ? 'is-active' : ''}
+        >
+          code block
+        </button>
+        {editor.isActive('codeBlock') && (
+          <select
+            value={editor.getAttributes('codeBlock').language || 'plain'}
+            onChange={e => {
+              editor
+                .chain()
+                .focus()
+                .setCodeBlock({ language: e.target.value })
+                .run();
+            }}
+          >
+            {languages.map(lang => (
+              <option key={lang.value} value={lang.value}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
       <button
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
@@ -112,25 +183,118 @@ const MenuBar = ({ editor }) => {
       <button onClick={() => editor.chain().focus().redo().run()}>
         redo
       </button>
+      <button
+        onClick={() => setIsVimMode(prev => !prev)}
+        className={isVimMode ? 'is-active' : ''}
+        title="Toggle Vim Mode (Ctrl/Cmd + Alt + V)"
+      >
+        {isVimMode ? 'Vim: ON' : 'Vim: OFF'}
+      </button>
     </div>
   );
 };
 
 export default function EditorComponent({note_path, branch_name, commit_id, setBranchNme, setCommitId}) {
   const [noteText, setNoteText] = React.useState("");
+  const [isVimMode, setIsVimMode] = React.useState(false);
   const abortRequestRef = React.useRef(null);
+
+  // Define VimKeymap inside the component
+  const VimKeymap = React.useMemo(() => {
+    return Extension.create({
+      name: 'vimKeymap',
+      addProseMirrorPlugins() {
+        if (!isVimMode) return [];
+        
+        return [
+          keymap({
+            'h': (state, dispatch) => {
+              if (dispatch) {
+                const { from } = state.selection;
+                if (from > 0) {
+                  dispatch(state.tr.setSelection(TextSelection.create(state.doc, from - 1)));
+                }
+              }
+              return true;
+            },
+            'l': (state, dispatch) => {
+              if (dispatch) {
+                const { from } = state.selection;
+                if (from < state.doc.content.size) {
+                  dispatch(state.tr.setSelection(TextSelection.create(state.doc, from + 1)));
+                }
+              }
+              return true;
+            },
+            'j': (state, dispatch) => {
+              if (dispatch) {
+                const { $from } = state.selection;
+                const after = $from.after();
+                if (after !== undefined) {
+                  dispatch(state.tr.setSelection(Selection.near(state.doc.resolve(after))));
+                }
+              }
+              return true;
+            },
+            'k': (state, dispatch) => {
+              if (dispatch) {
+                const { $from } = state.selection;
+                const before = $from.before();
+                if (before !== undefined) {
+                  dispatch(state.tr.setSelection(Selection.near(state.doc.resolve(before))));
+                }
+              }
+              return true;
+            },
+            'x': (state, dispatch) => {
+              if (dispatch) {
+                const { from, to } = state.selection;
+                dispatch(state.tr.delete(from, to + 1));
+              }
+              return true;
+            },
+          })
+        ];
+      },
+    });
+  }, [isVimMode]);
+
+  // Add keyboard shortcut for toggling Vim mode
+  React.useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.altKey && event.code === 'KeyV') {
+        event.preventDefault();
+        setIsVimMode(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Highlight.configure({
-        multicolor: false,
-        HTMLAttributes: {
-          class: 'highlighted-text',
+      StarterKit.configure({
+        codeBlock: false,
+        code: {
+          HTMLAttributes: {
+            class: 'inline-code',
+          },
         },
       }),
-      CodeBlockLowlight.configure({
+      Highlight,
+      CustomCodeBlock.configure({
         lowlight,
+        defaultLanguage: 'plain',
+      }),
+      VimKeymap,
+      Extension.create({
+        name: 'codeShortcuts',
+        addKeyboardShortcuts() {
+          return {
+            'Mod-e': () => this.editor.commands.toggleCode(),
+          }
+        },
       }),
     ],
     content: noteText,
@@ -207,10 +371,60 @@ export default function EditorComponent({note_path, branch_name, commit_id, setB
               <span className="file-path">{note_path}</span>
               <span className="commit-id">Commit: {commit_id?.substring(0, 7) || 'None'}</span>
             </div>
-            <MenuBar editor={editor} />
+            <MenuBar 
+              editor={editor} 
+              isVimMode={isVimMode} 
+              setIsVimMode={setIsVimMode}
+            />
           </div>
           <div className="editor-content">
-            <EditorContent editor={editor} />
+            {editor && (
+              <BubbleMenu 
+                className="bubble-menu" 
+                tippyOptions={{ duration: 100 }} 
+                editor={editor}
+                shouldShow={({ editor, view, state, from, to }) => {
+                  const isSelection = from !== to;
+                  const isCodeBlock = editor.isActive('codeBlock');
+                  const isCode = editor.isActive('code');
+                  return isSelection && !isCodeBlock && !isCode;
+                }}
+              >
+                <button
+                  onClick={() => editor.chain().focus().toggleBold().run()}
+                  className={editor.isActive('bold') ? 'is-active' : ''}
+                >
+                  bold
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleItalic().run()}
+                  className={editor.isActive('italic') ? 'is-active' : ''}
+                >
+                  italic
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleHighlight().run()}
+                  className={editor.isActive('highlight') ? 'is-active' : ''}
+                >
+                  highlight
+                </button>
+                <button
+                  onClick={() => {
+                    editor.chain().focus().toggleCode().run();
+                  }}
+                  className={editor.isActive('code') ? 'is-active' : ''}
+                  title="Inline Code (Ctrl/Cmd + E)"
+                >
+                  code
+                </button>
+              </BubbleMenu>
+            )}
+            <EditorContent editor={editor} spellcheck="false" />
+            {isVimMode && (
+              <div className="vim-mode-indicator">
+                VIM
+              </div>
+            )}
           </div>
         </>
       ) : (
