@@ -111,3 +111,47 @@ export async function handlePromise(promise, successCallback, failureCallback, m
       return false;
     }
   }
+
+export function createNote(repo_name, note_path, note_value, onSuccessCallback, onFailureCallback) {
+  if(!note_path) {
+    console.log(`Create Note Prevented: arguments empty note_path:${note_path}`);
+    return;
+  }
+
+  // Ensure note_value is at least an empty string if undefined
+  const content = note_value === undefined ? "" : note_value;
+
+  let api_route = ["create-note"];
+  let request_options = {method: RequestMethodType.POST, mode: "cors"};
+  let request_params = { 
+    repo_name: repo_name,
+    note_path: note_path,
+    note_value: content
+  };
+
+  let [promise, abortRequest] = getData(api_route, false, request_params, request_options);
+  handlePromise(promise, onSuccessCallback, onFailureCallback, "create-note");
+
+  return abortRequest;
+}
+
+export function deleteNote(repo_name, note_path, branch_name, onSuccessCallback, onFailureCallback) {
+  if(!note_path || !branch_name) {
+    console.log(`Delete Note Prevented: arguments empty note_path:${note_path} branch_name:${branch_name}`);
+    return;
+  }
+
+  let api_route = ["delete-note"];
+  let request_options = {method: RequestMethodType.DELETE, mode: "cors"};
+  let request_params = { 
+    repo_name: repo_name,
+    note_path: note_path,
+    branch_name: branch_name
+  };
+
+  // DELETE requests should have parameters in the body
+  let [promise, abortRequest] = getData(api_route, false, request_params, request_options);
+  handlePromise(promise, onSuccessCallback, onFailureCallback, "delete-note");
+
+  return abortRequest;
+}

@@ -5,7 +5,7 @@ import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createHighlighter } from 'shiki';
 import { common, createLowlight } from 'lowlight';
-import { getData, handlePromise, RequestMethodType } from "./utils";
+import { getData, handlePromise, RequestMethodType, createNote } from "./utils";
 import { VimMode } from './extensions/vim';
 import { keymap } from '@tiptap/pm/keymap';
 import { Selection, TextSelection } from '@tiptap/pm/state';
@@ -69,7 +69,7 @@ async function sendNodeUpdateRequest(note_path, branch_name, commit_id, note_val
   return abortRequest;
 }
 
-function effectGetNote(note_path, branch_name, setNoteText, setCommitId) {
+function effectGetNote(note_path, branch_name, onSuccess, onFailure) {
   if(!note_path || !branch_name){
     console.log(`Note Fetch Prevented: arguments empty note_path:${note_path} branch_name:${branch_name}`);
     return;
@@ -85,8 +85,21 @@ function effectGetNote(note_path, branch_name, setNoteText, setCommitId) {
 
   let [promise, abortRequest] = getData(api_route, true, request_params, request_options);
   handlePromise(promise,
-      (response) => { setNoteText(response.body.note); setCommitId(response.body.commit_id);},
-      (response) => { setNoteText(`Request failed with: ${JSON.stringify(response.error)}`); },
+      (response) => { 
+        const content = response.body.note;
+        const commitId = response.body.commit_id;
+        const isNewFile = response.body.is_new_file || false;
+        
+        if (typeof onSuccess === 'function') {
+          onSuccess(content, commitId, isNewFile);
+        }
+      },
+      (response) => { 
+        console.error(`Request failed with: ${JSON.stringify(response.error)}`);
+        if (typeof onFailure === 'function') {
+          onFailure(null);
+        }
+      },
       "EditorComponent get-note"
   );
 
@@ -194,9 +207,10 @@ const MenuBar = ({ editor, isVimMode, setIsVimMode }) => {
   );
 };
 
-export default function EditorComponent({note_path, branch_name, commit_id, setBranchNme, setCommitId}) {
+export default function EditorComponent({note_path, branch_name, commit_id, setBranchName, setCommitId, refreshFileList}) {
   const [noteText, setNoteText] = React.useState("");
   const [isVimMode, setIsVimMode] = React.useState(false);
+  const [isNewNote, setIsNewNote] = React.useState(false);
   const abortRequestRef = React.useRef(null);
 
   // Define VimKeymap inside the component
@@ -297,34 +311,88 @@ export default function EditorComponent({note_path, branch_name, commit_id, setB
         },
       }),
     ],
-    content: noteText,
+    content: isNewNote ? "" : noteText,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       setNoteText(html);
     },
   });
 
-  // Effect to fetch note when note_path or branch_name changes
   React.useEffect(() => {
-    if (note_path && branch_name) {
-      const abortRequest = effectGetNote(note_path, branch_name, text => {
-        setNoteText(text);
-        editor?.commands.setContent(text);
-      }, setCommitId);
-      return () => {
-        if (typeof abortRequest === 'function') {
-          abortRequest();
-        }
-      };
+    if (!note_path) {
+      setNoteText("");
+      setIsNewNote(false);
+      if (editor) {
+        editor.commands.setContent("");
+      }
+      return;
     }
-  }, [note_path, branch_name, setCommitId, editor]);
+
+    abortRequestRef.current = effectGetNote(note_path, branch_name, 
+      (content, commitId, isNewFile) => {
+        if (isNewFile && editor) {
+          // For new files, clear the editor first
+          editor.commands.setContent("");
+          setNoteText("");
+        } else {
+          setNoteText(content);
+        }
+        setCommitId(commitId);
+        setIsNewNote(isNewFile);
+      }, 
+      setCommitId
+    );
+    
+    return () => {
+      if (abortRequestRef.current && typeof abortRequestRef.current === 'function') {
+        abortRequestRef.current();
+      }
+    };
+  }, [note_path, branch_name, editor]);
+
+  // Add a useEffect to handle note deletion
+  React.useEffect(() => {
+    // When note_path is cleared (note deletion), reset the editor content
+    if (!note_path && editor) {
+      editor.commands.setContent("");
+      setIsNewNote(false);
+      // Clear any pending requests
+      if (abortRequestRef.current && typeof abortRequestRef.current === 'function') {
+        abortRequestRef.current();
+        abortRequestRef.current = null;
+      }
+    }
+  }, [note_path, editor]);
 
   // Effect to handle note updates with keyboard shortcut
   React.useEffect(() => {
     const handleKeyDown = (event) => {
       if ((event.metaKey || event.ctrlKey) && event.code === 'KeyS') {
         event.preventDefault();
-        if (note_path && branch_name && commit_id && noteText) {
+        
+        if (!note_path) return;
+        
+        const editorContent = editor?.getHTML() || "";
+        
+        if (isNewNote) {
+          // For new notes, use createNote
+          createNote(
+            REPO_NAME,
+            note_path,
+            editorContent,
+            (response) => {
+              console.log("New note created successfully"); 
+              setCommitId(response.body.commit_id || "HEAD");
+              setIsNewNote(false);
+              // Refresh the file list to ensure it's in sync with the server
+              if (typeof refreshFileList === 'function') {
+                refreshFileList();
+              }
+            },
+            (error) => { console.error("Failed to create note:", error); }
+          );
+        } else if (note_path && branch_name && commit_id && noteText) {
+          // For existing notes, use update
           const abortRequest = sendNodeUpdateRequest(
             note_path, 
             branch_name, 
@@ -349,7 +417,62 @@ export default function EditorComponent({note_path, branch_name, commit_id, setB
         abortRequestRef.current();
       }
     };
-  }, [noteText, note_path, branch_name, commit_id, setCommitId]);
+  }, [noteText, note_path, branch_name, commit_id, setCommitId, isNewNote, editor]);
+
+  // Add an effect to update editor when noteText changes
+  React.useEffect(() => {
+    if (editor && noteText !== undefined) {
+      // Only update if the editor content is different from noteText
+      // to avoid cursor jumping
+      const currentContent = editor.getHTML();
+      if (currentContent !== noteText) {
+        editor.commands.setContent(noteText);
+      }
+    }
+  }, [noteText, editor]);
+
+  const handleSave = () => {
+    if (!editor) return;
+    
+    const editorContent = editor.getHTML();
+    
+    if (isNewNote) {
+      // For a new note, save initial content
+      // Use create-note API instead of update for new notes
+      createNote(
+        REPO_NAME,
+        note_path,
+        editorContent,
+        (response) => {
+          console.log("New note created successfully:", response);
+          setCommitId(response.body.commit_id || "HEAD");
+          setIsNewNote(false);
+          // Refresh the file list to ensure it's in sync with the server
+          if (typeof refreshFileList === 'function') {
+            refreshFileList();
+          }
+        },
+        (error) => {
+          console.error("Failed to create note:", error);
+        }
+      );
+    } else {
+      // For existing notes, update as usual
+      sendNodeUpdateRequest(
+        note_path, 
+        branch_name, 
+        commit_id, 
+        editorContent,
+        (response) => {
+          console.log("Save successful:", response);
+          setCommitId(response.body.commit_id);
+        },
+        (error) => {
+          console.error("Save failed:", error);
+        }
+      );
+    }
+  };
 
   if(!branch_name) {
     return (
@@ -369,13 +492,29 @@ export default function EditorComponent({note_path, branch_name, commit_id, setB
           <div className="editor-header">
             <div className="file-info">
               <span className="file-path">{note_path}</span>
-              <span className="commit-id">Commit: {commit_id?.substring(0, 7) || 'None'}</span>
+              <span className="commit-id">
+                {isNewNote ? 
+                  <span className="new-note-indicator">New Note - Click Save When Done</span> : 
+                  `Commit: ${commit_id?.substring(0, 7) || 'None'}`
+                }
+              </span>
             </div>
-            <MenuBar 
-              editor={editor} 
-              isVimMode={isVimMode} 
-              setIsVimMode={setIsVimMode}
-            />
+            <div className="editor-header-actions">
+              {isNewNote && (
+                <button 
+                  className="save-button" 
+                  onClick={handleSave}
+                  title="Save this new note"
+                >
+                  Save
+                </button>
+              )}
+              <MenuBar 
+                editor={editor} 
+                isVimMode={isVimMode} 
+                setIsVimMode={setIsVimMode}
+              />
+            </div>
           </div>
           <div className="editor-content">
             {editor && (

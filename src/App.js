@@ -5,10 +5,17 @@ import ServerModeDisplay from "./ServerModeDisplay";
 
 export default function App() {
   const [note_path, setNotePath] = React.useState("");
-  const [branch_name, setBranchNme] = React.useState("master");
+  const [branch_name, setBranchName] = React.useState("master");
   const [commit_id, setCommitId] = React.useState("HEAD");
+  const [refreshTrigger, setRefreshTrigger] = React.useState(0);
   // TODO: get av repos for user.
   console.log(`new note path is ${note_path}`);
+  
+  // Function to refresh file list
+  const refreshFiles = () => {
+    // Increment refresh trigger to cause re-render in FileBrowserComponent
+    setRefreshTrigger(prev => prev + 1);
+  };
   
   // Get current date and time
   const getCurrentDateTime = () => {
@@ -22,10 +29,22 @@ export default function App() {
         <ServerModeDisplay/>
       </header>
       <main className="main-content">
-        <EditorComponent note_path={note_path} branch_name={branch_name} commit_id={commit_id} setBranchNme={setBranchNme} setCommitId={setCommitId} />
+        <EditorComponent 
+          note_path={note_path} 
+          branch_name={branch_name} 
+          commit_id={commit_id} 
+          setBranchName={setBranchName} 
+          setCommitId={setCommitId} 
+          refreshFileList={refreshFiles}
+        />
       </main>
       <section className="left-sidebar">
-        <FileBrowserComponent repo_name={"%2Fwenote-repo"} branch_name={branch_name} setNotePath={setNotePath} />
+        <FileBrowserComponent 
+          repo_name={"wenote-repo"} 
+          branch_name={branch_name} 
+          setNotePath={setNotePath} 
+          refreshTrigger={refreshTrigger}
+        />
       </section>
       <footer className="footer">
         <div className="footer-left">

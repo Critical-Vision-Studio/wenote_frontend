@@ -345,16 +345,21 @@ body {
 
 /* File browser container */
 .file-browser-container {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  border-right: 1px solid var(--border-color);
+  background-color: var(--bg-sidebar);
+  overflow: hidden;
 }
 
 /* File browser header */
 .file-browser-header {
-  padding: 1rem;
+  padding: 15px;
   border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-darker);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .file-browser-header h3 {
@@ -526,6 +531,32 @@ code {
   padding: 0.75rem 1rem;
   background-color: var(--bg-header);
   border-bottom: 1px solid var(--border-color);
+}
+
+.editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.save-button {
+  background-color: var(--accent-green);
+  color: var(--bg-dark);
+  border: none;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-button:hover {
+  opacity: 0.9;
+}
+
+.new-note-indicator {
+  color: var(--accent-yellow);
+  font-style: italic;
 }
 
 .file-info {
@@ -711,4 +742,91 @@ code {
   border-radius: 3px;
   font-family: var(--font-computer);
   font-size: 0.9em;
+}
+
+.file-browser-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.file-browser-actions button {
+  padding: 5px 10px;
+  font-size: 0.9em;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-note-btn {
+  background-color: var(--accent-green) !important;
+  color: var(--bg-dark) !important;
+}
+
+.delete-note-btn {
+  background-color: var(--accent-red) !important;
+  color: var(--bg-dark) !important;
+}
+
+.delete-note-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.file-browser-actions button:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.create-note-form {
+  padding: 15px;
+  background-color: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.create-note-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.create-note-form input {
+  padding: 8px;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.create-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.create-note-actions button {
+  padding: 5px 10px;
+  font-size: 0.9em;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.create-note-actions button[type="submit"] {
+  background-color: var(--accent-green);
+  color: var(--bg-dark);
+}
+
+.create-note-actions button[type="submit"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.create-note-actions button:hover:not(:disabled) {
+  opacity: 0.8;
 }
